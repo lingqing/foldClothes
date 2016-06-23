@@ -16,8 +16,8 @@ public:
 	bool init();
 	bool playToEnd(unsigned char num, unsigned int _mSec);
 	bool setPlayMode(unsigned char mode);
-private:
 	bool play(unsigned char num);
+private:	
 	bool waitForConfirm(unsigned int _mSec);
 	bool waitToEnd(unsigned int _mSec);
 };
