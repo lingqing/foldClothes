@@ -16,6 +16,7 @@ void TSC_Count();
 void TSC_WB(int Level0, int Level1);
 void TSC_FilterColor(int Level01, int Level02);
 void TSC_Init();
+void getPara();
 uint8_t getColor();
 //class ColorSensor
 //{

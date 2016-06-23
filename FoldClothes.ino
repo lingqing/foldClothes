@@ -67,7 +67,8 @@ void test()
   // delay(1000);
   // motor3.runToLimit(FORWARD, 2000);
   // delay(1000); 
-  /*detectClothesColor(); 
+  
+  detectClothesColor(); 
   switch (colorClothes) {
       case 0:
         player.playToEnd(10, 5000);
@@ -84,12 +85,12 @@ void test()
       default:
         // do something
         return;
-  }*/
+  }
   // int i = waitForPutClothes();
   // 
   // Serial.println(i);
-  delay(1000);
-  foldClothes();
+  // delay(1000);
+  // foldClothes();
 }
 /**
  * setup for initial
@@ -190,7 +191,8 @@ uint8_t detectClothesColor()
   // else
   {
     colorClothes = getColor();
-    Serial.println(colorClothes);
+    // Serial.print("clothes color is: ");
+    // Serial.println(colorClothes);
     return colorClothes;
   } 
 }
