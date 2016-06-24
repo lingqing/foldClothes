@@ -7,13 +7,13 @@
  /* ---------- user define ------------- */  
 // servo
 #define SERVO_POS_INIT 1500
-#define SERVO_POS_LEFT 700
-#define SERVO_POS_RIGHT 2000
+#define SERVO_POS_LEFT 500
+#define SERVO_POS_RIGHT 2500
 // #define SERVO_POS_LEFT 1000
 #define SERVO_POS_BACK 2100
 
 /* ---------- include ------------- */ 
-#include <Servo.h>  // 鑸垫満搴�
+// #include <Servo.h>  // 鑸垫満搴�
 #include "UserMotor.h"  // 鑷畾涔夌數鏈洪┍鍔�
 #include "ColorSensor.h"  // 棰滆壊浼犳劅鍣�
 #include "MusicPlayer.h"
@@ -35,7 +35,7 @@
 #define DETECT_PIN    13    // 衣服坚持传感器
 #define PLATE_PIN     9
 
-// #define SPEAK
+#define SPEAK
 // #define _TEST_
 /* ---------- type define ------------- */
 typedef enum{
@@ -49,13 +49,13 @@ typedef enum{
   }MachineState;
 
   /* ---------- global var ------------- */
-  Servo servoPlate;
+  // Servo servoPlate;
   UserServo myServo;
   UserMotor motor1(1);
   UserMotor motor2(2);
   UserMotor motor3(3);
   MusicPlayer player;
-//ColorSensor colorSensor;
+// ColorSensor colorSensor;
 MachineState state;
 static uint8_t colorClothes = 0;
 
@@ -64,12 +64,12 @@ static uint8_t colorClothes = 0;
  */
  void test()
  {
- 
-  for(int i=0; i<3; i++){
-    colorClothes = i + 1;
-    Serial.println(i+1);
-      whirlPlate();
-  }
+    player.playToEnd(1, 5000); 
+  // for(int i=0; i<3; i++){
+  //   colorClothes = i + 1;
+  //   Serial.println(i+1);
+  //     whirlPlate();
+  // }
 }
 /**
  * setup for initial
@@ -102,7 +102,7 @@ static uint8_t colorClothes = 0;
   TSC_Init();
   // TODO TSC_Close;
   delay(1000);  
-  state = READY;
+  state = INIT;
 }
 /**
  * loop main
@@ -154,9 +154,6 @@ static uint8_t colorClothes = 0;
  void foldClothes()
  {
   // motor1.runToLimit(FORWARD, 1000);
-  #ifdef SPEAK
-  player.playToEnd(20, 15000);        // 开始叠衣服
-  #endif
   // 
   motor1.runToTime(FORWARD, 600);
   delay(1100);
@@ -218,12 +215,9 @@ static uint8_t colorClothes = 0;
   player.play(18);     //     归类衣服
   delay(5000);
   #endif;  
-  
-  // static int i = 1;
-  // if(i++ >=3) i = 1;
-  // colorClothes = i;
-  Serial.print("color is :");
-  Serial.println(colorClothes);
+
+  // Serial.print("color is :");
+  // Serial.println(colorClothes);
 
   switch (colorClothes) {
     case 1:
@@ -256,7 +250,7 @@ static uint8_t colorClothes = 0;
   #ifdef SPEAK
   player.playToEnd(19, 10000);
   #endif;
-  servoPlate.write(SERVO_POS_INIT);
+  myServo.write(SERVO_POS_INIT);
   switch (colorClothes) {
     case 1:      
     case 2:      
