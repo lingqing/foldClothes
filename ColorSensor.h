@@ -1,7 +1,7 @@
 #ifndef _ColorSensor_H_
 #define _ColorSensor_H_
 
-#include <TimerOne.h>
+// #include <TimerOne.h>
 #include <Arduino.h>
 
 #define S0     A0   // Please notice the Pin's define
@@ -11,7 +11,7 @@
 #define OUT    2
   
 
-void TSC_Callback();
+// void TSC_Callback();
 void TSC_Count();
 void TSC_WB(int Level0, int Level1);
 void TSC_FilterColor(int Level01, int Level02);

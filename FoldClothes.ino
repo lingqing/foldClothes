@@ -6,14 +6,14 @@
  *******************************************************************/
  /* ---------- user define ------------- */  
 // servo
-#define SERVO_POS_INIT 1500
-#define SERVO_POS_LEFT 500
-#define SERVO_POS_RIGHT 2500
+#define SERVO_POS_INIT 1480       // INIT 1430 800
+#define SERVO_POS_LEFT 800
+#define SERVO_POS_RIGHT 2100
 // #define SERVO_POS_LEFT 1000
 #define SERVO_POS_BACK 2100
 
 /* ---------- include ------------- */ 
-// #include <Servo.h>  // 鑸垫満搴�
+#include <Servo.h>  // 鑸垫満搴�
 #include "UserMotor.h"  // 鑷畾涔夌數鏈洪┍鍔�
 #include "ColorSensor.h"  // 棰滆壊浼犳劅鍣�
 #include "MusicPlayer.h"
@@ -35,7 +35,7 @@
 #define DETECT_PIN    13    // 衣服坚持传感器
 #define PLATE_PIN     9
 
-#define SPEAK
+// #define SPEAK
 // #define _TEST_
 /* ---------- type define ------------- */
 typedef enum{
@@ -49,8 +49,8 @@ typedef enum{
   }MachineState;
 
   /* ---------- global var ------------- */
-  // Servo servoPlate;
-  UserServo myServo;
+  Servo servoPlate;
+  // UserServo servoPlate;
   UserMotor motor1(1);
   UserMotor motor2(2);
   UserMotor motor3(3);
@@ -64,12 +64,13 @@ static uint8_t colorClothes = 0;
  */
  void test()
  {
-    player.playToEnd(1, 5000); 
+    // player.playToEnd(1, 5000); 
   // for(int i=0; i<3; i++){
   //   colorClothes = i + 1;
   //   Serial.println(i+1);
   //     whirlPlate();
   // }
+  getColor();
 }
 /**
  * setup for initial
@@ -77,10 +78,8 @@ static uint8_t colorClothes = 0;
  void setup() {
   // put your setup code here, to run once:
   // 电机 舵机 初始化  
-  // servoPlate.attach(PLATE_PIN);   // 舵机 ---> PORT 9
-  // servoPlate.write(SERVO_POS_INIT);
-  myServo.attach(PLATE_PIN);
-  myServo.write(SERVO_POS_INIT);
+  servoPlate.attach(PLATE_PIN);   // 舵机 ---> PORT 9
+  servoPlate.write(SERVO_POS_INIT);
 
   motor1.attach(MOTOR1_RUN_A, MOTOR1_DIR_B, LIMIT_LEFT );
   motor2.attach(MOTOR2_RUN_A, MOTOR2_DIR_B, LIMIT_RIGHT);
@@ -107,10 +106,7 @@ static uint8_t colorClothes = 0;
 /**
  * loop main
  */
- void loop() {
-  // put your main code here, to run repeatedly:
-  
-  // 鐘舵�佹満杞崲
+ void loop() { 
   // Serial.println(state);
   switch(state)
   {
@@ -128,7 +124,7 @@ static uint8_t colorClothes = 0;
     if(waitForPutClothes()) state = COLOR;
     break;
     case COLOR:
-    if(detectClothesColor()) state = FOLD;
+    if(detectClothesColor() != 0) state = FOLD;
     else state = READY;
     break;
     case FOLD:
@@ -201,11 +197,11 @@ static uint8_t colorClothes = 0;
       default:
         // do something
         break;
-    }
-    #endif
-    return colorClothes;
-  } 
-}
+      }
+      #endif
+      return colorClothes;
+    } 
+  }
 /**
  * 鏃嬭浆鏀惰。杞洏
  */
@@ -222,22 +218,22 @@ static uint8_t colorClothes = 0;
   switch (colorClothes) {
     case 1:
     Serial.println("case 1");
-    myServo.write(SERVO_POS_LEFT);
+    servoPlate.write(SERVO_POS_LEFT);
     delay(1500);
     break;
     case 2:
     Serial.println("case 2");
-    myServo.write(SERVO_POS_RIGHT);
+    servoPlate.write(SERVO_POS_RIGHT);
     delay(1500);
     break;
     case 3:
     Serial.println("case 3");
-    myServo.write(SERVO_POS_BACK);
+    servoPlate.write(SERVO_POS_BACK);
     delay(2500);
     break;
     default:
     Serial.println("case default");
-    myServo.write(SERVO_POS_INIT);
+    servoPlate.write(SERVO_POS_INIT);
     delay(1500);
     return;      
   }  
@@ -248,9 +244,10 @@ static uint8_t colorClothes = 0;
  void whirlPlateToInit()
  {
   #ifdef SPEAK
-  player.playToEnd(19, 10000);
+  player.playToEnd(19, 9000);
   #endif;
-  myServo.write(SERVO_POS_INIT);
+  waitForClearClothes();
+  servoPlate.write(SERVO_POS_INIT);
   switch (colorClothes) {
     case 1:      
     case 2:      
@@ -273,36 +270,46 @@ static uint8_t colorClothes = 0;
   static uint8_t waitState = 0;  // 0 -- open
                             // 1 -- wait to confirm
                             // 2 -- confirm close  
-                            static unsigned int _waitTime;
-                            switch(waitState)
-                            {
-                              case 0:
-                              if (LOW == digitalRead(DETECT_PIN))
-                              {
-                                _waitTime = millis();
-                                waitState = 1;
-                              }
-                              break;
-                              case 1:
-    if (LOW == digitalRead(DETECT_PIN))  // 继续高位
+  static unsigned int _waitTime;
+  switch(waitState)
+  {
+    case 0:
+    if (LOW == digitalRead(DETECT_PIN))
     {
-      if (millis() - _waitTime >= 20)
+      _waitTime = millis();
+      waitState = 1;
+    }
+    break;
+    case 1:
+    if (LOW == digitalRead(DETECT_PIN))  // 继续低位
+    {
+      if (millis() - _waitTime >= 30)
       {
         waitState = 2;
       }
     }
     else waitState = 0;
     break;
-    case 2:      
+    case 2: 
+    if (LOW == digitalRead(DETECT_PIN))  // 继续低位
+    {
+      if (millis() - _waitTime >= 60)
+      {
+        waitState = 3;
+      }
+    } 
+    else waitState = 0; 
     break;
-    default:
-    return false;
+    case 3:      
+    break;
+
   }
-  if(2 == waitState)
+  if(3 == waitState)
   {
     waitState = 0;
     #ifdef SPEAK
     player.play(17);    // 检测到衣服，开始识别颜色
+    delay(3000);
     #endif 
     return true;
   }
@@ -311,3 +318,61 @@ static uint8_t colorClothes = 0;
     return false;
   }
 }
+/**
+ * 
+ */
+bool waitForClearClothes()
+ {
+  uint8_t waitState = 0;  // 0 -- open
+                            // 1 -- wait to confirm
+                            // 2 -- confirm close  
+  unsigned int _waitTime;
+  #ifdef SPEAK
+      player.play(19);    //  请取走衣服
+  #endif 
+  while(true){
+    switch(waitState)
+    {
+      case 0:
+      if (HIGH == digitalRead(DETECT_PIN))
+      {
+        _waitTime = millis();
+        waitState = 1;
+      }
+      break;
+      case 1:
+      if (HIGH == digitalRead(DETECT_PIN))  // 继续高位
+      {
+        if (millis() - _waitTime >= 30)
+        {
+          waitState = 2;
+        }
+      }
+      else waitState = 0;
+      break;
+      case 2:
+      if (HIGH == digitalRead(DETECT_PIN))  // 继续高位
+      {
+        if (millis() - _waitTime >= 60)
+        {
+          waitState = 3;
+        }
+      }
+      else waitState = 0;
+      break;
+      case 3:
+
+      break;
+
+    }
+    if(3 == waitState)
+    {      
+      #ifdef SPEAK
+      player.play(21);    // 检测到衣服取走
+      delay(2000);
+      #endif 
+      return true;
+    } 
+  }  
+}
+

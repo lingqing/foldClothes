@@ -37,7 +37,7 @@ void UserServo::servopulse(int pulsewidth)
  */
 void UserServo::write(int pulsewidth)
 {
-	for(int i=0; i<50; i++){
+	for(int i=0; i<100; i++){
 	    servopulse(pulsewidth);
 	}	
 }
