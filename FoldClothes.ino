@@ -108,6 +108,7 @@ static uint8_t colorClothes = 0;
  */
  void loop() { 
   // Serial.println(state);
+  uint8_t colorGet;
   switch(state)
   {
     case TEST:
@@ -122,10 +123,13 @@ static uint8_t colorClothes = 0;
     break;
     case READY:
     if(waitForPutClothes()) state = COLOR;
+    else state = READY;
     break;
     case COLOR:
-    if(detectClothesColor() != 0) state = FOLD;
-    else state = READY;
+    colorGet = detectClothesColor();
+    if(0 == colorGet) state = READY;    
+    else if(4 != colorGet) state = COLOR;
+    else state = FOLD;
     break;
     case FOLD:
     foldClothes();
@@ -140,7 +144,8 @@ static uint8_t colorClothes = 0;
     state = READY;
     break;
     default:
-    state = INIT;    
+    state = INIT;   
+    break; 
   } // end of switch
 } // end of loop
 
@@ -182,7 +187,7 @@ static uint8_t colorClothes = 0;
     colorClothes = getColor();
     #ifdef SPEAK
     switch (colorClothes) {
-      case 0:
+      case 4:
       player.playToEnd(14, 5000);     // 颜色无法识别
       break;
       case 1:
@@ -194,9 +199,6 @@ static uint8_t colorClothes = 0;
       case 3:
       player.playToEnd(13, 5000);
       break;
-      default:
-        // do something
-        break;
       }
       #endif
       return colorClothes;
@@ -211,10 +213,8 @@ static uint8_t colorClothes = 0;
   player.play(18);     //     归类衣服
   delay(5000);
   #endif;  
-
   // Serial.print("color is :");
   // Serial.println(colorClothes);
-
   switch (colorClothes) {
     case 1:
     Serial.println("case 1");
@@ -243,15 +243,12 @@ static uint8_t colorClothes = 0;
  */
  void whirlPlateToInit()
  {
-  #ifdef SPEAK
-  player.playToEnd(19, 9000);
-  #endif;
   waitForClearClothes();
   servoPlate.write(SERVO_POS_INIT);
   switch (colorClothes) {
     case 1:      
     case 2:      
-    delay(1000);
+    delay(1500);
     break;
     case 3:      
     delay(2000);
@@ -302,7 +299,6 @@ static uint8_t colorClothes = 0;
     break;
     case 3:      
     break;
-
   }
   if(3 == waitState)
   {
@@ -361,18 +357,17 @@ bool waitForClearClothes()
       else waitState = 0;
       break;
       case 3:
-
       break;
-
     }
     if(3 == waitState)
     {      
       #ifdef SPEAK
       player.play(21);    // 检测到衣服取走
-      delay(2000);
+      delay(3500);
       #endif 
       return true;
-    } 
-  }  
+    }
+  }
+  return false;  
 }
 

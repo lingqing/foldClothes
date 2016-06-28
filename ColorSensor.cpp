@@ -177,6 +177,6 @@ int color2 = 0;
   // 
   // Timer1.detachInterrupt();
   if(color1 == color2) return color1+1;
-  else return 0;  
+  else return 4;  
   // return 0;
 }
