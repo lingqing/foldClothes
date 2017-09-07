@@ -1,3 +1,5 @@
+#include <SoftwareSerial.h>
+
 #include "ColorSensor.h"
 
 #define PERIOD_TIME 500    // 500 ms

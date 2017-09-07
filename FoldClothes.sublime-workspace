@@ -21,7 +21,7 @@
 			],
 			[
 				"ifd",
-				"ifdef	\\#ifdef"
+				"ifdef\t\\#ifdef"
 			],
 			[
 				"wait",
@@ -81,7 +81,7 @@
 			],
 			[
 				"mi",
-				"millis	Arduino millis()"
+				"millis\tArduino millis()"
 			],
 			[
 				"un",
@@ -101,7 +101,7 @@
 			],
 			[
 				"if",
-				"if	Arduino if"
+				"if\tArduino if"
 			],
 			[
 				"whi",
@@ -109,7 +109,7 @@
 			],
 			[
 				"sw",
-				"switch	Arduino switch"
+				"switch\tArduino switch"
 			],
 			[
 				"det",
@@ -121,7 +121,7 @@
 			],
 			[
 				"de",
-				"delay	Arduino delay()"
+				"delay\tArduino delay()"
 			],
 			[
 				"s",
@@ -188,15 +188,65 @@
 	"buffers":
 	[
 		{
+			"contents": "/********************************************************************\n * File Name: FoldClothes\n * Description: 鍙犺。鏉跨▼搴忥紝瀹屾垚鍙犺。鏈嶇殑宸ヤ綔\n * Author:  AndyLiang\n * Date :   2016-6-16 \n *\n * update : V2.0 \n *         change put cloth way to using Arm\n *         which need send G-code, so add softwareserial to communit\n *         with Arm\n *         2017-09-06, AndyLiang\n *******************************************************************/\n /* ---------- user define ------------- */  \n// servo\n#define SERVO_POS_INIT 1480       // INIT 1430 800\n#define SERVO_POS_LEFT 800\n#define SERVO_POS_RIGHT 2100\n// #define SERVO_POS_LEFT 1000\n#define SERVO_POS_BACK 2100\n\n/* ---------- include ------------- */ \n#include <Servo.h>  // 鑸垫満搴�\n#include \"UserMotor.h\"  // 鑷畾涔夌數鏈洪┍鍔�\n#include \"ColorSensor.h\"  // 棰滆壊浼犳劅鍣�\n#include \"MusicPlayer.h\"\n#include \"UserServo.h\"\n\n#include \"GcodeSender.h\"  // softwareserial to communit to Arm\n/* ---------- define ------------- */ \n// define\n#define MOTOR1_RUN_A 3\n#define MOTOR1_DIR_B 4\n#define MOTOR2_RUN_A 5\n#define MOTOR2_DIR_B 6\n#define MOTOR3_RUN_A 7\n#define MOTOR3_DIR_B 8\n\n#define LIMIT_LEFT    11\n#define LIMIT_RIGHT   10\n#define LIMIT_BACK    12\n\n#define DETECT_PIN    13    // 衣服检测传感器\n#define PLATE_PIN     9\n\n\n// #define SPEAK\n// #define _TEST_\n/* ---------- type define ------------- */\ntypedef enum{\n  INIT,\n  READY,\n  COLOR,\n  FOLD,\n  WHIRL,\n  ENDING,\n  TEST,\n}MachineState;\n\n/* ---------- global var ------------- */\nServo servoPlate;\n// UserServo servoPlate;\nUserMotor motor1(1);\nUserMotor motor2(2);\nUserMotor motor3(3);\nMusicPlayer player;\n\n//\nGcodeSender sender;\n// ColorSensor colorSensor;\nMachineState state;\nstatic uint8_t colorClothes = 0;\n\n/**\n * test\n */\n void test()\n {\n    // player.playToEnd(1, 5000); \n  // for(int i=0; i<3; i++){\n  //   colorClothes = i + 1;\n  //   Serial.println(i+1);\n  //     whirlPlate();\n  // }\n  getColor();\n}\n/**\n * setup for initial\n */\n void setup() {\n  // put your setup code here, to run once:\n  // 电机 舵机 初始化  \n  servoPlate.attach(PLATE_PIN);   // 舵机 ---> PORT 9\n  servoPlate.write(SERVO_POS_INIT);\n\n  motor1.attach(MOTOR1_RUN_A, MOTOR1_DIR_B, LIMIT_LEFT );\n  motor2.attach(MOTOR2_RUN_A, MOTOR2_DIR_B, LIMIT_RIGHT);\n  motor3.attach(MOTOR3_RUN_A, MOTOR3_DIR_B, LIMIT_BACK );\n\n  #ifndef _TEST_\n  motor1.runToLimit(BACKWARD, 3000);\n  delay(1000);\n  motor2.runToLimit(BACKWARD, 3000);\n  delay(1000);\n  motor3.runToLimit(BACKWARD, 3000);\n  delay(1000);\n  #endif\n  // MP3 初始化\n  player.init();\n  // 传感器初始化\n  pinMode(DETECT_PIN , INPUT);\n\n  TSC_Init();\n  // TODO TSC_Close;\n  delay(1000);  \n  state = INIT;\n}\n/**\n * loop main\n */\n void loop() { \n  // Serial.println(state);\n  uint8_t colorGet;\n  switch(state)\n  {\n    case TEST:\n    test();\n    break;\n    case INIT:\n    #ifdef SPEAK\n    player.playToEnd(1, 5000);\n    player.playToEnd(20, 5000);\n    #endif\n    state = READY;\n    break;\n    case READY:\n    if(waitForPutClothes()) state = COLOR;\n    else state = READY;\n    break;\n    case COLOR:\n    colorGet = detectClothesColor();\n    if(0 == colorGet) state = READY;    \n    else if(4 != colorGet) state = COLOR;\n    else state = FOLD;\n    break;\n    case FOLD:\n    foldClothes();\n    state = WHIRL;\n    break;\n    case WHIRL:\n    whirlPlate();   // to color position\n    state = ENDING;\n    break;\n    case ENDING:\n    whirlPlateToInit();   // to init position\n    state = READY;\n    break;\n    default:\n    state = INIT;   \n    break; \n  } // end of switch\n} // end of loop\n\n/**\n * 鍙犺。鏈嶅彔鏉挎帶鍒剁▼搴�\n */\n void foldClothes()\n {\n  // motor1.runToLimit(FORWARD, 1000);\n  // \n  motor1.runToTime(FORWARD, 600);\n  delay(1100);\n  motor1.runToLimit(BACKWARD, 800);\n  delay(1100);\n  motor2.runToTime(FORWARD, 550);\n  delay(1100);\n  motor2.runToLimit(BACKWARD, 700);\n  delay(1100);\n  motor3.runToTime(FORWARD, 550);\n  delay(1100);\n  motor3.runToLimit(BACKWARD, 1000);\n  delay(1100);\n}\n/**\n *\n */\n uint8_t detectClothesColor()\n {\n  colorClothes = 0;\n  if(HIGH == digitalRead(DETECT_PIN))\n  {\n    #ifdef SPEAK\n    player.playToEnd(10, 15000);     // 没有检测到衣服\n    #endif\n    return 0;\n  } \n  else\n  {\n    colorClothes = getColor();\n    #ifdef SPEAK\n    switch (colorClothes) {\n      case 4:\n      player.playToEnd(14, 5000);     // 颜色无法识别\n      break;\n      case 1:\n      player.playToEnd(11, 5000);\n      break;\n      case 2:\n      player.playToEnd(12, 5000);\n      break;\n      case 3:\n      player.playToEnd(13, 5000);\n      break;\n      }\n      #endif\n      return colorClothes;\n    } \n  }\n/**\n * 鏃嬭浆鏀惰。杞洏\n */\n void whirlPlate()\n {\n  #ifdef SPEAK\n  player.play(18);     //     归类衣服\n  delay(5000);\n  #endif;  \n  // Serial.print(\"color is :\");\n  // Serial.println(colorClothes);\n  switch (colorClothes) {\n    case 1:\n    Serial.println(\"case 1\");\n    servoPlate.write(SERVO_POS_LEFT);\n    delay(1500);\n    break;\n    case 2:\n    Serial.println(\"case 2\");\n    servoPlate.write(SERVO_POS_RIGHT);\n    delay(1500);\n    break;\n    case 3:\n    Serial.println(\"case 3\");\n    servoPlate.write(SERVO_POS_BACK);\n    delay(2500);\n    break;\n    default:\n    Serial.println(\"case default\");\n    servoPlate.write(SERVO_POS_INIT);\n    delay(1500);\n    return;      \n  }  \n}\n/**\n * \n */\n void whirlPlateToInit()\n {\n  waitForClearClothes();\n  servoPlate.write(SERVO_POS_INIT);\n  switch (colorClothes) {\n    case 1:      \n    case 2:      \n    delay(1500);\n    break;\n    case 3:      \n    delay(2000);\n    break;\n    default:      \n    return;      \n  } \n  colorClothes = 0; // init color \n}\n/**\n *\n *\n */\n bool waitForPutClothes()\n {\n  static uint8_t waitState = 0;  // 0 -- open\n                            // 1 -- wait to confirm\n                            // 2 -- confirm close  \n  static unsigned int _waitTime;\n  switch(waitState)\n  {\n    case 0:\n    if (LOW == digitalRead(DETECT_PIN))\n    {\n      _waitTime = millis();\n      waitState = 1;\n    }\n    break;\n    case 1:\n    if (LOW == digitalRead(DETECT_PIN))  // 继续低位\n    {\n      if (millis() - _waitTime >= 30)\n      {\n        waitState = 2;\n      }\n    }\n    else waitState = 0;\n    break;\n    case 2: \n    if (LOW == digitalRead(DETECT_PIN))  // 继续低位\n    {\n      if (millis() - _waitTime >= 60)\n      {\n        waitState = 3;\n      }\n    } \n    else waitState = 0; \n    break;\n    case 3:      \n    break;\n  }\n  if(3 == waitState)\n  {\n    waitState = 0;\n    #ifdef SPEAK\n    player.play(17);    // 检测到衣服，开始识别颜色\n    delay(3000);\n    #endif \n    return true;\n  }\n  else\n  {\n    return false;\n  }\n}\n/**\n * \n */\nbool waitForClearClothes()\n {\n  uint8_t waitState = 0;  // 0 -- open\n                            // 1 -- wait to confirm\n                            // 2 -- confirm close  \n  unsigned int _waitTime;\n  #ifdef SPEAK\n      player.play(19);    //  请取走衣服\n  #endif \n  while(true){\n    switch(waitState)\n    {\n      case 0:\n      if (HIGH == digitalRead(DETECT_PIN))\n      {\n        _waitTime = millis();\n        waitState = 1;\n      }\n      break;\n      case 1:\n      if (HIGH == digitalRead(DETECT_PIN))  // 继续高位\n      {\n        if (millis() - _waitTime >= 30)\n        {\n          waitState = 2;\n        }\n      }\n      else waitState = 0;\n      break;\n      case 2:\n      if (HIGH == digitalRead(DETECT_PIN))  // 继续高位\n      {\n        if (millis() - _waitTime >= 60)\n        {\n          waitState = 3;\n        }\n      }\n      else waitState = 0;\n      break;\n      case 3:\n      break;\n    }\n    if(3 == waitState)\n    {      \n      #ifdef SPEAK\n      player.play(21);    // 检测到衣服取走\n      delay(3500);\n      #endif \n      return true;\n    }\n  }\n  return false;  \n}\n\n",
 			"file": "FoldClothes.ino",
+			"file_size": 8167,
+			"file_write_time": 131492609675580682,
 			"settings":
 			{
-				"buffer_size": 7196,
-				"line_ending": "Unix"
+				"buffer_size": 7483,
+				"line_ending": "Windows"
 			}
 		},
 		{
+			"contents": "/***************************************************\n * Music player \n * \n * 2016-6-20 \n***************************************************/\n\n#include \"MusicPlayer.h\"\n\n/* ----------- static cmd -------------- */\nstatic unsigned char cmd_stop[8] = {0x7e,0x02,0x0E,0xef};\t// 4 byte\nstatic unsigned char cmd_play[8] = {0x7e,0x02,0x01,0xef};\t// 4 byte\nstatic unsigned char cmd_pause[8] = {0x7e,0x02,0x02,0xef};\t// 4 byte\n\nstatic unsigned char cmd_vol_inc[8] = {0x7e,0x02,0x05,0xef};\t// 4 byte\nstatic unsigned char cmd_vol_dec[8] = {0x7e,0x02,0x06,0xef};\t// 4 byte\n/**\n * [MusicPlayer description]\n * @type {[type]}\n */\nMusicPlayer::MusicPlayer()\n{\n\t// Serial.begin(9600);\n}\n/**\n * [MusicPlayer description]\n * @type {[type]}\n */\nbool MusicPlayer::init()\n{\n\tSerial.begin(9600);\n\t// Serial.println(\"Test\");\n\tSerial.write(cmd_stop, 8);\t\n\twaitForConfirm(1000);\n\tsetPlayMode(4); // ONE_STOP\n}\n/**\n * 播放序号为 num 的曲目\n * @type {[type]}\n */\nbool MusicPlayer::play(unsigned char num)\n{\t\n\tSerial.flush();\n\tSerial.write(cmd_stop, 8);\n\t// Serial.println(\"wait for confirm\");\n\twaitForConfirm(1500);\n\n\tunsigned char cmddata[8] = {0x7e,0x04,0x44,0x01,0x00,0xef};\n\tcmddata[4] = num;\n\tSerial.write(cmddata, 8);\n\twaitForConfirm(1500);\n\n\treturn true;\n}\n\n/**\n * \n */\nbool MusicPlayer::waitForConfirm(unsigned int _mSec)\n{\n\tSerial.flush();\t\t//\n\tchar readBuf[10];\n\tunsigned char bufPos = 0;\n\tunsigned char readPos = 0;\n\tunsigned char size = 0;\n\tunsigned long _time = millis();\n\tmemset(readBuf, 0, 10);\n\t// Serial.println(\"wait for confirm\");\n\t_time = millis();\n\twhile(millis() - _time <= _mSec){\n\t\twhile(Serial.available() > 0){\n\t\t\treadBuf[bufPos++] = Serial.read();\t\n\t\t\tif(bufPos > 9) bufPos = 0;\n\t\t\tif(size <= 9) size ++;\n\t\t}\n\t\tif(size > 1){\n\t\t    if(readBuf[readPos] == 'O' \n\t\t    \t&& readBuf[(readPos>=9)?0:(readPos+1)] == 'K')\n\t\t    {\n\t\t    \treturn true;\n\t\t    }\n\t\t    else\n\t\t    {\n\t\t    \tif(readPos >= 9) readPos = 0;\n\t\t    \telse readPos ++;\n\t\t    \tsize --;\n\t\t    }\n\t\t}\t\t\n\t}\n\treturn false;\t\n}\n/**\n * [MusicPlayer description]\n * @type {[type]}\n */\nbool MusicPlayer::playToEnd(unsigned char num, unsigned int _mSec)\n{\n\tplay(num);\n\twaitToEnd(_mSec);\n\tdelay(1000);  \n\treturn true;\t\n}\n/**\n * [MusicPlayer description]\n * @type {[type]}\n */\nbool MusicPlayer::waitToEnd(unsigned int _mSec)\n{\n\tSerial.flush();\t\t//\n\tchar readBuf[20];\n\tunsigned char bufPos = 0;\n\tunsigned char readPos = 0;\n\tunsigned char size = 0;\n\tunsigned long _time = millis();\n\tmemset(readBuf, 0, 20);\n\t_time = millis();\n\twhile(millis() - _time <= _mSec){\n\t\twhile(Serial.available() > 0){\n\t\t\treadBuf[bufPos++] = Serial.read();\t\n\t\t\tif(bufPos > 19) bufPos = 0;\n\t\t\tif(size <= 19) size ++;\n\t\t}\n\t\tif(size > 3){\n\t\t    if(readBuf[readPos] == 'S' \n\t\t    \t&& readBuf[(readPos>=19)?0:(readPos+1)] == 'T'\n\t\t    \t&& readBuf[(readPos>=19)?1:(readPos+2)] == 'O'\n\t\t    \t&& readBuf[(readPos>=19)?2:(readPos+3)] == 'P')\n\t\t    {\n\t\t    \treturn true;\n\t\t    }\n\t\t    else\n\t\t    {\n\t\t    \tif(readPos >= 19) readPos = 0;\n\t\t    \telse readPos ++;\n\t\t    \tsize --;\n\t\t    }\n\t\t}\t\t\n\t}\n\treturn false;\t\n}\n/**\n * [MusicPlayer description]\n * @type {[type]}\n */\nbool MusicPlayer::setPlayMode(unsigned char mode)\n{\n\tunsigned char cmddata[8] = {0x7e,0x03,0x33,0x00,0xef};\t\n\tcmddata[4] = mode;\n\tSerial.write(cmddata, 8);\n\tif(!waitForConfirm(1000)) return false;\n\treturn true;\n}\n",
+			"file": "MusicPlayer.cpp",
+			"file_size": 3446,
+			"file_write_time": 131490554180000000,
+			"settings":
+			{
+				"buffer_size": 3279,
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"contents": "#ifndef _MusicPlayer_h_\n#define _MusicPlayer_h_\n/***************************************************\n * Music player \n * \n * 2016-6-20 \n***************************************************/\n#include <Arduino.h>\n\nclass MusicPlayer\n{\npublic:\n\tMusicPlayer();\n\t// ~MusicPlayer();\n\n\tbool init();\n\tbool playToEnd(unsigned char num, unsigned int _mSec);\n\tbool setPlayMode(unsigned char mode);\n\tbool play(unsigned char num);\nprivate:\t\n\tbool waitForConfirm(unsigned int _mSec);\n\tbool waitToEnd(unsigned int _mSec);\n};\n\n#endif\n",
+			"file": "MusicPlayer.h",
+			"file_size": 541,
+			"file_write_time": 131490554180000000,
+			"settings":
+			{
+				"buffer_size": 516,
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"contents": "#include \"GcodeSender.h\"\n\n/**\n * [Gcodesender description]\n * @type {[type]}\n */\nGcodeSender::GcodeSender()\n{\n\n}\n/**\n * [Gcodesender description]\n * @type {[type]}\n */\nGcodeSender::~GcodeSender()\n{\n\t\n}",
+			"file": "GCodeSender.cpp",
+			"file_size": 218,
+			"file_write_time": 131492606556825973,
+			"settings":
+			{
+				"buffer_size": 201,
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"contents": "#ifndef _GCODESENDER_H_\n#define _GCODESENDER_H_\n\n/***************************************************\n * Gcoder Sender\n * \n * 2017-09-07 \n***************************************************/\n#include <Arduino.h>\n#include <SoftwareSerial.h>\n\nclass GCodeSender\n{\npublic:\n\tGCodeSender();\n\t~GCodeSender();\n\nprivate:\n\tSoftwareSerial sfSerial;\n\t\n};\n\n\n#endif",
+			"file": "GCodeSender.h",
+			"file_size": 374,
+			"file_write_time": 131492609391403960,
+			"settings":
+			{
+				"buffer_size": 351,
+				"line_ending": "Windows"
+			}
+		},
+		{
+			"contents": "\n#include \"UserServo.h\"\n\n/**\n * [UserServo description]\n * @type {[type]}\n */\nUserServo::UserServo()\n{\n\n}\n/**\n * [UserServo description]\n * @type {[type]}\n */\nvoid UserServo::attach(uint8_t pin)\n{\n\tpulsePin = pin;\n\tpinMode(pulsePin,OUTPUT);//设定舵机接口为输出接口\n}\n/**\n * [UserServo description]\n * @type {[type]}\n */\nvoid UserServo::servopulse(int pulsewidth)\n{\n\tif(pulsewidth <= 500) pulsewidth = 500;\n\tif(pulsewidth >= 2480) pulsewidth = 2480;  \t//将角度转化为500-2480的脉宽值\n\tdigitalWrite(pulsePin,HIGH);    \t//将舵机接口电平至高\n\tdelayMicroseconds(pulsewidth);  \t//延时脉宽值的微秒数\n\tdigitalWrite(pulsePin,LOW);     \t//将舵机接口电平至低\n\tdelayMicroseconds(20000-pulsewidth);\n}\n/**\n * [UserServo description]\n * @type {[type]}\n */\nvoid UserServo::write(int pulsewidth)\n{\n\tfor(int i=0; i<100; i++){\n\t    servopulse(pulsewidth);\n\t}\t\n}\n",
 			"file": "UserServo.cpp",
+			"file_size": 933,
+			"file_write_time": 131490554180000000,
 			"settings":
 			{
 				"buffer_size": 794,
@@ -204,7 +254,10 @@
 			}
 		},
 		{
+			"contents": "\n#ifndef _UserServo_h\n#define _UserServo_h\n\n#include <Arduino.h>\n\nclass UserServo\n{\npublic:\n\tUserServo();\n\t// ~UserServo();\n\t\n\tvoid attach(uint8_t);\n\tvoid write(int pulsewidth);\n\t\nprivate:\n\tuint8_t pulsePin;\n\tvoid servopulse(int pulsewidth);\n};\n\n\n#endif",
 			"file": "UserServo.h",
+			"file_size": 274,
+			"file_write_time": 131490554180000000,
 			"settings":
 			{
 				"buffer_size": 253,
@@ -212,23 +265,10 @@
 			}
 		},
 		{
-			"file": "ColorSensor.cpp",
-			"settings":
-			{
-				"buffer_size": 4455,
-				"line_ending": "Windows"
-			}
-		},
-		{
-			"file": "ColorSensor.h",
-			"settings":
-			{
-				"buffer_size": 697,
-				"line_ending": "Windows"
-			}
-		},
-		{
+			"contents": "/************************************************\n * \n *  UserMotor Driver for fold clothes\n *  Author: Andy\n *  Date  : 2016-6-17\n ***********************************************/\n#include <avr/io.h>\n#include \"UserMotor.h\"\n#include <Arduino.h>\n\n/**\n * 电机初始化： 引脚初始化\n */\nUserMotor::UserMotor(uint8_t num)\n{\n  motornum = num;  \n}\n/**\n * [UserMotor description]\n * @type {[type]}\n */\nvoid UserMotor::attach(uint8_t pinA, uint8_t pinB, uint8_t pinC)\n{\n  pinRunA = pinA;\n  pinDirB = pinB;\n  pinLimitC = pinC;\n\n  pinMode(pinRunA, OUTPUT);\n  pinMode(pinDirB, OUTPUT);\n  digitalWrite(pinRunA ,LOW);\n  digitalWrite(pinDirB ,LOW);  // 停止电机\n  pinMode(pinLimitC , INPUT);\n}\n\n/**\n * [UserMotor description]\n * @type {[type]}\n */\nvoid UserMotor::run(uint8_t cmd)\n{\n  switch (cmd) {  //设置电机运行状态\n  case FORWARD:\n    digitalWrite(pinRunA, HIGH);\n    digitalWrite(pinDirB, LOW);\n    // if(pinRunA != pinDirB)  digitalWrite(pinDirB, LOW); // 鐢垫満3  \n    break;\n  case BACKWARD:\n    digitalWrite(pinRunA, HIGH);\n    digitalWrite(pinDirB, HIGH);\n    // if(pinRunA != pinDirB)  digitalWrite(pinDirB, HIGH); // 鐢垫満3\n    break;\n  case BRAKE:\n    digitalWrite(pinRunA, LOW);\n    digitalWrite(pinDirB, LOW);\n    // if(dirPinA != pinDirB)  digitalWrite(dirPinB, 0); // 鐢垫満3\n    break;\n  }\n}\n/**\n * [UserMotor description]\n * @type {[type]}\n */\nvoid UserMotor::runToLimit(uint8_t cmd,unsigned long mSec)\n{\n  unsigned long _time = millis();  \n \n  uint8_t sensorState = 0;  // 0 -- open\n                            // 1 -- wait to confirm\n                            // 2 -- confirm close\n  unsigned int _waitTime;\n  while((millis() - _time) <= mSec)\n  {\n    switch(sensorState)\n    {\n    case 0:\n      if (HIGH == digitalRead(pinLimitC))\n      {\n        _waitTime = millis();\n        sensorState = 1;\n      }\n      else run(cmd);\n    break;\n    case 1:\n      if (HIGH == digitalRead(pinLimitC))  // 继续高位\n      {\n        if (millis() - _waitTime >= 20)\n        {\n          sensorState = 2;\n        }\n      }\n      else sensorState = 0;\n    break;\n    case 2:      \n    break;\n    default:\n    return;\n    }\n    if(2 == sensorState) break; // break of while    \n  }\n  run(BRAKE);\n}\n/**\n * [UserMotor description]\n * @type {[type]}\n */\nvoid UserMotor::runToTime(uint8_t cmd,unsigned long mSec)\n{\n  run(cmd);\n  delay(mSec);\n  run(BRAKE);\n}\n/******************************************\n               MOTORS\n******************************************/\n// inline void initPWM3(uint8_t freq) {\n// #if defined(__AVR_ATmega8__) || \\\n//     defined(__AVR_ATmega48__) || \\\n//     defined(__AVR_ATmega88__) || \\\n//     defined(__AVR_ATmega168__) || \\\n//     defined(__AVR_ATmega328P__)\n//     // use PWM from timer2B (pin 3)\n//     TCCR2A |= _BV(COM2B1) | _BV(WGM20) | _BV(WGM21); // fast PWM, turn on oc2b\n//     TCCR2B = freq & 0x7;\n//     OCR2B = 0;\n// #elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)\n//     // on arduino mega, pin 3 is now PE5 (OC3C)\n//     TCCR3A |= _BV(COM1C1) | _BV(WGM10); // fast PWM, turn on oc3c\n//     TCCR3B = (freq & 0x7) | _BV(WGM12);\n//     OCR3C = 0;\n// #else\n//    #error \"This chip is not supported!\"\n// #endif\n\n//     pinMode(3, OUTPUT);\n// }\n\n// inline void setPWM3(uint8_t s) {\n// #if defined(__AVR_ATmega8__) || \\\n//     defined(__AVR_ATmega48__) || \\\n//     defined(__AVR_ATmega88__) || \\\n//     defined(__AVR_ATmega168__) || \\\n//     defined(__AVR_ATmega328P__)\n//     // use PWM from timer2A on PB3 (Arduino pin #11)\n//     OCR2B = s;\n// #elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)\n//     // on arduino mega, pin 11 is now PB5 (OC1A)\n//     OCR3C = s;\n// #else\n//    #error \"This chip is not supported!\"\n// #endif\n// }\n/**\n * \n */\n// void UserMotor::setSpeed(uint8_t speed)\n// {\n// //  float speedVol = (speed * 5.0 / 255);\n//   switch (motornum) {\n//   case 1:\n//     analogWrite(MOTOR1_PWM, speed); break;\n//   case 2:\n//     analogWrite(MOTOR2_PWM, speed); break;\n//   case 3:\n//     analogWrite(MOTOR3_PWM, speed); break;\n//   default:\n//     return;\n//   }\n// }\n\n\n",
 			"file": "UserMotor.cpp",
+			"file_size": 4249,
+			"file_write_time": 131490554180000000,
 			"settings":
 			{
 				"buffer_size": 4007,
@@ -236,7 +276,10 @@
 			}
 		},
 		{
+			"contents": "/************************************************\n * \n *  UserMotor Driver for fold clothes\n *  Author: Andy\n *  Date  : 2016-6-17\n ***********************************************/\n\n#ifndef _UserMotor_h_\n#define _UserMotor_h_\n#include <Arduino.h>\n#include <inttypes.h>\n\n/* -------------- state define ---------- */\n#define FORWARD 1\n#define BACKWARD 2\n#define BRAKE 3\n// #define RELEASE 4\n\nclass UserMotor\n{\n public:\n  UserMotor(uint8_t motornum);\n  void run(uint8_t);\n  // void setSpeed(uint8_t);\n  void attach(uint8_t pinDirA, uint8_t pinDirB, uint8_t pinLimitC); \n  void runToLimit(uint8_t cmd,unsigned long mSec);\n  void runToTime(uint8_t cmd,unsigned long mSec);\n private:\n  uint8_t motornum, pinRunA, pinDirB, pinLimitC;\n};\n\n#endif\n\n",
 			"file": "UserMotor.h",
+			"file_size": 772,
+			"file_write_time": 131490554180000000,
 			"settings":
 			{
 				"buffer_size": 739,
@@ -244,7 +287,10 @@
 			}
 		},
 		{
+			"contents": "PORT\t------>\t\tFUN\n\n0\t\t------> \tSerial Rx\n1\t\t------> \tSerial Tx\n2\t\t------> \text interrupt (TSC3200 OUT)\n3\t\t------> \tMotor1 run\n4\t\t------> \tMotor1 dir\n5\t\t------> \tMotor2 run\n6\t\t------> \tMotor2 dir\n7\t\t------> \tMotor3 run\n8\t\t------> \tMotor3 dir\n9\t\t------> \tServo pwm\n10\t\t------> \tsensor postion limit 2\n11\t\t------> \tsensor postion limit 1\n12\t\t------> \tsensor postion limit 3\n13\t\t------> \tsensor clothes detect\n14(A0)\t------> \tTSC3200 S0\n15(A1)\t------> \tTSC3200 S1\n16(A2)\t------> \tTSC3200 S2\n17(A3)\t------> \tTSC3200 S3\n18(A4)\t------> \tNC\n19(A5)\t------> \tNC\n\n// 在3个限位传感器的地方，添加 input down 下拉电阻\n\n声音编号\n001     初始化完成，开始工作\n002         叠衣小助手可以叠衣服了，请您将衣服轻轻平放在叠衣板上，然后将您的手远离叠衣板\n\n010     衣服颜色无法识别\n016     没有检测到衣服\n017     检测到衣服，开始识别颜色\n018     开始归类衣服\n019     衣服叠完，请取走衣服\n\n020     开始叠衣服\n\n021     衣服已经取走，叠下一件衣服",
 			"file": "PinDefine.txt",
+			"file_size": 1086,
+			"file_write_time": 131490554180000000,
 			"settings":
 			{
 				"buffer_size": 789,
@@ -260,9 +306,13 @@
 	"command_palette":
 	{
 		"height": 392.0,
-		"last_filter": "ins",
+		"last_filter": "rem",
 		"selected_items":
 		[
+			[
+				"rem",
+				"Package Control: Remove Package"
+			],
 			[
 				"ins",
 				"Package Control: Install Package"
@@ -274,10 +324,6 @@
 			[
 				"in",
 				"Package Control: Install Package"
-			],
-			[
-				"rem",
-				"Package Control: Remove Package"
 			],
 			[
 				"add",
@@ -308,7 +354,7 @@
 				"Package Control: Install Package"
 			]
 		],
-		"width": 464.0
+		"width": 536.0
 	},
 	"console":
 	{
@@ -330,6 +376,10 @@
 	},
 	"file_history":
 	[
+		"/L/06. 项目/04. NewPower/叠衣板v2.0/foldClothes/GCodeSender.h",
+		"/L/06. 项目/04. NewPower/叠衣板v2.0/foldClothes/GCodeSender.cpp",
+		"/F/10_WorkFiles/ArduinoWork/FoldClothes/ColorSensor.h",
+		"/F/10_WorkFiles/ArduinoWork/FoldClothes/ColorSensor.cpp",
 		"/E/WorkFiles/ArduinoWork/FoldClothes/MusicPlayer.cpp",
 		"/E/WorkFiles/ArduinoWork/FoldClothes/MusicPlayer.h",
 		"/E/WorkFiles/ArduinoWork/FoldClothes/ColorSensor.cpp",
@@ -432,15 +482,15 @@
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 7196,
+						"buffer_size": 7483,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								1010,
-								1010
+								0,
+								7483
 							]
 						],
 						"settings":
@@ -451,75 +501,88 @@
 								"close":
 								{
 								},
+								"icon":
+								{
+								},
 								"open":
 								{
+								},
+								"unmatched":
+								{
+									"1":
+									[
+										4671,
+										4672
+									]
 								}
 							},
 							"bracket_highlighter.regions":
 							[
-								"bh_default",
-								"bh_default_center",
-								"bh_default_open",
-								"bh_default_close",
-								"bh_default_content",
-								"bh_round",
-								"bh_round_center",
-								"bh_round_open",
-								"bh_round_close",
-								"bh_round_content",
-								"bh_double_quote",
-								"bh_double_quote_center",
-								"bh_double_quote_open",
-								"bh_double_quote_close",
-								"bh_double_quote_content",
-								"bh_c_define",
-								"bh_c_define_center",
-								"bh_c_define_open",
-								"bh_c_define_close",
-								"bh_c_define_content",
-								"bh_regex",
-								"bh_regex_center",
-								"bh_regex_open",
-								"bh_regex_close",
-								"bh_regex_content",
 								"bh_curly",
 								"bh_curly_center",
 								"bh_curly_open",
 								"bh_curly_close",
 								"bh_curly_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
 								"bh_square",
 								"bh_square_center",
 								"bh_square_open",
 								"bh_square_close",
 								"bh_square_content",
-								"bh_angle",
-								"bh_angle_center",
-								"bh_angle_open",
-								"bh_angle_close",
-								"bh_angle_content",
-								"bh_single_quote",
-								"bh_single_quote_center",
-								"bh_single_quote_open",
-								"bh_single_quote_close",
-								"bh_single_quote_content",
 								"bh_unmatched",
 								"bh_unmatched_center",
 								"bh_unmatched_open",
 								"bh_unmatched_close",
 								"bh_unmatched_content",
-								"bh_tag",
-								"bh_tag_center",
-								"bh_tag_open",
-								"bh_tag_close",
-								"bh_tag_content"
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content"
 							],
+							"is_init_dirty_state": true,
+							"origin_encoding": "UTF-8",
 							"side_bar_folders_auto_load_folder": 1,
 							"syntax": "Packages/User/Stino/Arduino.tmLanguage",
 							"tab_size": 2,
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 397.0,
+						"translation.y": 611.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 0,
@@ -527,6 +590,467 @@
 				},
 				{
 					"buffer": 1,
+					"file": "MusicPlayer.cpp",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 3279,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								667,
+								667
+							]
+						],
+						"settings":
+						{
+							"bracket_highlighter.busy": false,
+							"bracket_highlighter.locations":
+							{
+								"close":
+								{
+									"1":
+									[
+										668,
+										669
+									]
+								},
+								"icon":
+								{
+									"1":
+									[
+										"Packages/BracketHighlighter/icons/curly_bracket.png",
+										"brackethighlighter.default"
+									]
+								},
+								"open":
+								{
+									"1":
+									[
+										642,
+										643
+									]
+								},
+								"unmatched":
+								{
+								}
+							},
+							"bracket_highlighter.regions":
+							[
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content"
+							],
+							"is_init_dirty_state": true,
+							"origin_encoding": "UTF-8",
+							"syntax": "Packages/User/Stino/Arduino.tmLanguage",
+							"translate_tabs_to_spaces": false
+						},
+						"translation.x": 0.0,
+						"translation.y": 114.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"type": "text"
+				},
+				{
+					"buffer": 2,
+					"file": "MusicPlayer.h",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 516,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								444,
+								444
+							]
+						],
+						"settings":
+						{
+							"bracket_highlighter.busy": false,
+							"bracket_highlighter.locations":
+							{
+								"close":
+								{
+									"1":
+									[
+										505,
+										506
+									]
+								},
+								"icon":
+								{
+									"1":
+									[
+										"Packages/BracketHighlighter/icons/curly_bracket.png",
+										"brackethighlighter.default"
+									]
+								},
+								"open":
+								{
+									"1":
+									[
+										229,
+										230
+									]
+								},
+								"unmatched":
+								{
+								}
+							},
+							"bracket_highlighter.regions":
+							[
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content"
+							],
+							"is_init_dirty_state": true,
+							"origin_encoding": "ASCII",
+							"syntax": "Packages/C++/C++.sublime-syntax"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 2,
+					"type": "text"
+				},
+				{
+					"buffer": 3,
+					"file": "GCodeSender.cpp",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 201,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								116,
+								116
+							]
+						],
+						"settings":
+						{
+							"bracket_highlighter.busy": false,
+							"bracket_highlighter.locations":
+							{
+								"close":
+								{
+								},
+								"icon":
+								{
+								},
+								"open":
+								{
+								},
+								"unmatched":
+								{
+								}
+							},
+							"bracket_highlighter.regions":
+							[
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content"
+							],
+							"is_init_dirty_state": true,
+							"syntax": "Packages/User/Stino/Arduino.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 3,
+					"type": "text"
+				},
+				{
+					"buffer": 4,
+					"file": "GCodeSender.h",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 351,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								260,
+								260
+							]
+						],
+						"settings":
+						{
+							"bracket_highlighter.busy": false,
+							"bracket_highlighter.locations":
+							{
+								"close":
+								{
+									"1":
+									[
+										340,
+										341
+									]
+								},
+								"icon":
+								{
+									"1":
+									[
+										"Packages/BracketHighlighter/icons/curly_bracket.png",
+										"brackethighlighter.default"
+									]
+								},
+								"open":
+								{
+									"1":
+									[
+										259,
+										260
+									]
+								},
+								"unmatched":
+								{
+								}
+							},
+							"bracket_highlighter.regions":
+							[
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_single_quote",
+								"bh_single_quote_center",
+								"bh_single_quote_open",
+								"bh_single_quote_close",
+								"bh_single_quote_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_unmatched",
+								"bh_unmatched_center",
+								"bh_unmatched_open",
+								"bh_unmatched_close",
+								"bh_unmatched_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content"
+							],
+							"is_init_dirty_state": true,
+							"origin_encoding": "ASCII",
+							"syntax": "Packages/C++/C++.sublime-syntax"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 4,
+					"type": "text"
+				},
+				{
+					"buffer": 5,
 					"file": "UserServo.cpp",
 					"semi_transient": false,
 					"settings":
@@ -538,8 +1062,8 @@
 						"selection":
 						[
 							[
-								750,
-								750
+								102,
+								102
 							]
 						],
 						"settings":
@@ -551,89 +1075,103 @@
 								{
 									"1":
 									[
-										756,
-										757
+										104,
+										105
+									]
+								},
+								"icon":
+								{
+									"1":
+									[
+										"Packages/BracketHighlighter/icons/curly_bracket.png",
+										"brackethighlighter.default"
 									]
 								},
 								"open":
 								{
 									"1":
 									[
-										736,
-										737
+										101,
+										102
 									]
+								},
+								"unmatched":
+								{
 								}
 							},
 							"bracket_highlighter.regions":
 							[
-								"bh_default",
-								"bh_default_center",
-								"bh_default_open",
-								"bh_default_close",
-								"bh_default_content",
-								"bh_round",
-								"bh_round_center",
-								"bh_round_open",
-								"bh_round_close",
-								"bh_round_content",
-								"bh_double_quote",
-								"bh_double_quote_center",
-								"bh_double_quote_open",
-								"bh_double_quote_close",
-								"bh_double_quote_content",
-								"bh_c_define",
-								"bh_c_define_center",
-								"bh_c_define_open",
-								"bh_c_define_close",
-								"bh_c_define_content",
-								"bh_regex",
-								"bh_regex_center",
-								"bh_regex_open",
-								"bh_regex_close",
-								"bh_regex_content",
 								"bh_curly",
 								"bh_curly_center",
 								"bh_curly_open",
 								"bh_curly_close",
 								"bh_curly_content",
-								"bh_square",
-								"bh_square_center",
-								"bh_square_open",
-								"bh_square_close",
-								"bh_square_content",
-								"bh_angle",
-								"bh_angle_center",
-								"bh_angle_open",
-								"bh_angle_close",
-								"bh_angle_content",
 								"bh_single_quote",
 								"bh_single_quote_center",
 								"bh_single_quote_open",
 								"bh_single_quote_close",
 								"bh_single_quote_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
 								"bh_unmatched",
 								"bh_unmatched_center",
 								"bh_unmatched_open",
 								"bh_unmatched_close",
 								"bh_unmatched_content",
-								"bh_tag",
-								"bh_tag_center",
-								"bh_tag_open",
-								"bh_tag_close",
-								"bh_tag_content"
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content"
 							],
+							"is_init_dirty_state": true,
+							"origin_encoding": "UTF-8",
 							"side_bar_folders_auto_load_folder": 1,
-							"syntax": "Packages/User/Stino/Arduino.tmLanguage"
+							"syntax": "Packages/User/Stino/Arduino.tmLanguage",
+							"translate_tabs_to_spaces": false
 						},
 						"translation.x": 0.0,
 						"translation.y": 114.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 4,
+					"stack_index": 6,
 					"type": "text"
 				},
 				{
-					"buffer": 2,
+					"buffer": 6,
 					"file": "UserServo.h",
 					"semi_transient": false,
 					"settings":
@@ -645,8 +1183,8 @@
 						"selection":
 						[
 							[
-								225,
-								225
+								177,
+								177
 							]
 						],
 						"settings":
@@ -658,77 +1196,90 @@
 								{
 									"1":
 									[
-										239,
-										240
+										242,
+										243
+									]
+								},
+								"icon":
+								{
+									"1":
+									[
+										"Packages/BracketHighlighter/icons/curly_bracket.png",
+										"brackethighlighter.default"
 									]
 								},
 								"open":
 								{
 									"1":
 									[
-										224,
-										225
+										82,
+										83
 									]
+								},
+								"unmatched":
+								{
 								}
 							},
 							"bracket_highlighter.regions":
 							[
-								"bh_default",
-								"bh_default_center",
-								"bh_default_open",
-								"bh_default_close",
-								"bh_default_content",
-								"bh_round",
-								"bh_round_center",
-								"bh_round_open",
-								"bh_round_close",
-								"bh_round_content",
-								"bh_double_quote",
-								"bh_double_quote_center",
-								"bh_double_quote_open",
-								"bh_double_quote_close",
-								"bh_double_quote_content",
-								"bh_c_define",
-								"bh_c_define_center",
-								"bh_c_define_open",
-								"bh_c_define_close",
-								"bh_c_define_content",
-								"bh_regex",
-								"bh_regex_center",
-								"bh_regex_open",
-								"bh_regex_close",
-								"bh_regex_content",
 								"bh_curly",
 								"bh_curly_center",
 								"bh_curly_open",
 								"bh_curly_close",
 								"bh_curly_content",
-								"bh_square",
-								"bh_square_center",
-								"bh_square_open",
-								"bh_square_close",
-								"bh_square_content",
-								"bh_angle",
-								"bh_angle_center",
-								"bh_angle_open",
-								"bh_angle_close",
-								"bh_angle_content",
 								"bh_single_quote",
 								"bh_single_quote_center",
 								"bh_single_quote_open",
 								"bh_single_quote_close",
 								"bh_single_quote_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
 								"bh_unmatched",
 								"bh_unmatched_center",
 								"bh_unmatched_open",
 								"bh_unmatched_close",
 								"bh_unmatched_content",
-								"bh_tag",
-								"bh_tag_center",
-								"bh_tag_open",
-								"bh_tag_close",
-								"bh_tag_content"
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content"
 							],
+							"is_init_dirty_state": true,
+							"origin_encoding": "ASCII",
 							"side_bar_folders_auto_load_folder": 1,
 							"syntax": "Packages/C++/C++.sublime-syntax"
 						},
@@ -740,223 +1291,7 @@
 					"type": "text"
 				},
 				{
-					"buffer": 3,
-					"file": "ColorSensor.cpp",
-					"semi_transient": false,
-					"settings":
-					{
-						"buffer_size": 4455,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								3467,
-								3467
-							]
-						],
-						"settings":
-						{
-							"bracket_highlighter.busy": false,
-							"bracket_highlighter.locations":
-							{
-								"close":
-								{
-									"1":
-									[
-										4453,
-										4454
-									]
-								},
-								"open":
-								{
-									"1":
-									[
-										2953,
-										2954
-									]
-								}
-							},
-							"bracket_highlighter.regions":
-							[
-								"bh_default",
-								"bh_default_center",
-								"bh_default_open",
-								"bh_default_close",
-								"bh_default_content",
-								"bh_round",
-								"bh_round_center",
-								"bh_round_open",
-								"bh_round_close",
-								"bh_round_content",
-								"bh_double_quote",
-								"bh_double_quote_center",
-								"bh_double_quote_open",
-								"bh_double_quote_close",
-								"bh_double_quote_content",
-								"bh_c_define",
-								"bh_c_define_center",
-								"bh_c_define_open",
-								"bh_c_define_close",
-								"bh_c_define_content",
-								"bh_regex",
-								"bh_regex_center",
-								"bh_regex_open",
-								"bh_regex_close",
-								"bh_regex_content",
-								"bh_curly",
-								"bh_curly_center",
-								"bh_curly_open",
-								"bh_curly_close",
-								"bh_curly_content",
-								"bh_square",
-								"bh_square_center",
-								"bh_square_open",
-								"bh_square_close",
-								"bh_square_content",
-								"bh_angle",
-								"bh_angle_center",
-								"bh_angle_open",
-								"bh_angle_close",
-								"bh_angle_content",
-								"bh_single_quote",
-								"bh_single_quote_center",
-								"bh_single_quote_open",
-								"bh_single_quote_close",
-								"bh_single_quote_content",
-								"bh_unmatched",
-								"bh_unmatched_center",
-								"bh_unmatched_open",
-								"bh_unmatched_close",
-								"bh_unmatched_content",
-								"bh_tag",
-								"bh_tag_center",
-								"bh_tag_open",
-								"bh_tag_close",
-								"bh_tag_content"
-							],
-							"side_bar_folders_auto_load_folder": 1,
-							"syntax": "Packages/User/Stino/Arduino.tmLanguage",
-							"tab_size": 2,
-							"translate_tabs_to_spaces": true
-						},
-						"translation.x": 0.0,
-						"translation.y": 912.0,
-						"zoom_level": 1.0
-					},
-					"stack_index": 3,
-					"type": "text"
-				},
-				{
-					"buffer": 4,
-					"file": "ColorSensor.h",
-					"semi_transient": false,
-					"settings":
-					{
-						"buffer_size": 697,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								224,
-								224
-							]
-						],
-						"settings":
-						{
-							"bracket_highlighter.busy": false,
-							"bracket_highlighter.locations":
-							{
-								"close":
-								{
-									"1":
-									[
-										690,
-										696
-									]
-								},
-								"open":
-								{
-									"1":
-									[
-										0,
-										7
-									]
-								}
-							},
-							"bracket_highlighter.regions":
-							[
-								"bh_default",
-								"bh_default_center",
-								"bh_default_open",
-								"bh_default_close",
-								"bh_default_content",
-								"bh_round",
-								"bh_round_center",
-								"bh_round_open",
-								"bh_round_close",
-								"bh_round_content",
-								"bh_double_quote",
-								"bh_double_quote_center",
-								"bh_double_quote_open",
-								"bh_double_quote_close",
-								"bh_double_quote_content",
-								"bh_c_define",
-								"bh_c_define_center",
-								"bh_c_define_open",
-								"bh_c_define_close",
-								"bh_c_define_content",
-								"bh_regex",
-								"bh_regex_center",
-								"bh_regex_open",
-								"bh_regex_close",
-								"bh_regex_content",
-								"bh_curly",
-								"bh_curly_center",
-								"bh_curly_open",
-								"bh_curly_close",
-								"bh_curly_content",
-								"bh_square",
-								"bh_square_center",
-								"bh_square_open",
-								"bh_square_close",
-								"bh_square_content",
-								"bh_angle",
-								"bh_angle_center",
-								"bh_angle_open",
-								"bh_angle_close",
-								"bh_angle_content",
-								"bh_single_quote",
-								"bh_single_quote_center",
-								"bh_single_quote_open",
-								"bh_single_quote_close",
-								"bh_single_quote_content",
-								"bh_unmatched",
-								"bh_unmatched_center",
-								"bh_unmatched_open",
-								"bh_unmatched_close",
-								"bh_unmatched_content",
-								"bh_tag",
-								"bh_tag_center",
-								"bh_tag_open",
-								"bh_tag_close",
-								"bh_tag_content"
-							],
-							"side_bar_folders_auto_load_folder": 1,
-							"syntax": "Packages/C++/C++.sublime-syntax"
-						},
-						"translation.x": 0.0,
-						"translation.y": 0.0,
-						"zoom_level": 1.0
-					},
-					"stack_index": 2,
-					"type": "text"
-				},
-				{
-					"buffer": 5,
+					"buffer": 7,
 					"file": "UserMotor.cpp",
 					"semi_transient": false,
 					"settings":
@@ -1042,6 +1377,8 @@
 								"bh_tag_close",
 								"bh_tag_content"
 							],
+							"is_init_dirty_state": true,
+							"origin_encoding": "UTF-8",
 							"side_bar_folders_auto_load_folder": 1,
 							"syntax": "Packages/User/Stino/Arduino.tmLanguage",
 							"tab_size": 2,
@@ -1051,11 +1388,11 @@
 						"translation.y": 1651.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 6,
+					"stack_index": 8,
 					"type": "text"
 				},
 				{
-					"buffer": 6,
+					"buffer": 8,
 					"file": "UserMotor.h",
 					"semi_transient": false,
 					"settings":
@@ -1084,6 +1421,14 @@
 										666
 									]
 								},
+								"icon":
+								{
+									"1":
+									[
+										"Packages/BracketHighlighter/icons/round_bracket.png",
+										"brackethighlighter.default"
+									]
+								},
 								"open":
 								{
 									"1":
@@ -1091,50 +1436,43 @@
 										634,
 										635
 									]
+								},
+								"unmatched":
+								{
 								}
 							},
 							"bracket_highlighter.regions":
 							[
-								"bh_default",
-								"bh_default_center",
-								"bh_default_open",
-								"bh_default_close",
-								"bh_default_content",
-								"bh_round",
-								"bh_round_center",
-								"bh_round_open",
-								"bh_round_close",
-								"bh_round_content",
-								"bh_double_quote",
-								"bh_double_quote_center",
-								"bh_double_quote_open",
-								"bh_double_quote_close",
-								"bh_double_quote_content",
 								"bh_c_define",
 								"bh_c_define_center",
 								"bh_c_define_open",
 								"bh_c_define_close",
 								"bh_c_define_content",
-								"bh_regex",
-								"bh_regex_center",
-								"bh_regex_open",
-								"bh_regex_close",
-								"bh_regex_content",
 								"bh_curly",
 								"bh_curly_center",
 								"bh_curly_open",
 								"bh_curly_close",
 								"bh_curly_content",
-								"bh_square",
-								"bh_square_center",
-								"bh_square_open",
-								"bh_square_close",
-								"bh_square_content",
-								"bh_angle",
-								"bh_angle_center",
-								"bh_angle_open",
-								"bh_angle_close",
-								"bh_angle_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_tag",
+								"bh_tag_center",
+								"bh_tag_open",
+								"bh_tag_close",
+								"bh_tag_content",
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content",
 								"bh_single_quote",
 								"bh_single_quote_center",
 								"bh_single_quote_open",
@@ -1145,12 +1483,24 @@
 								"bh_unmatched_open",
 								"bh_unmatched_close",
 								"bh_unmatched_content",
-								"bh_tag",
-								"bh_tag_center",
-								"bh_tag_open",
-								"bh_tag_close",
-								"bh_tag_content"
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content"
 							],
+							"is_init_dirty_state": true,
+							"origin_encoding": "ASCII",
 							"side_bar_folders_auto_load_folder": 1,
 							"syntax": "Packages/C++/C++.sublime-syntax"
 						},
@@ -1158,11 +1508,11 @@
 						"translation.y": 82.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 7,
+					"stack_index": 9,
 					"type": "text"
 				},
 				{
-					"buffer": 7,
+					"buffer": 9,
 					"file": "PinDefine.txt",
 					"semi_transient": false,
 					"settings":
@@ -1186,76 +1536,84 @@
 								"close":
 								{
 								},
+								"icon":
+								{
+								},
 								"open":
+								{
+								},
+								"unmatched":
 								{
 								}
 							},
 							"bracket_highlighter.regions":
 							[
-								"bh_default",
-								"bh_default_center",
-								"bh_default_open",
-								"bh_default_close",
-								"bh_default_content",
-								"bh_round",
-								"bh_round_center",
-								"bh_round_open",
-								"bh_round_close",
-								"bh_round_content",
-								"bh_double_quote",
-								"bh_double_quote_center",
-								"bh_double_quote_open",
-								"bh_double_quote_close",
-								"bh_double_quote_content",
-								"bh_c_define",
-								"bh_c_define_center",
-								"bh_c_define_open",
-								"bh_c_define_close",
-								"bh_c_define_content",
-								"bh_regex",
-								"bh_regex_center",
-								"bh_regex_open",
-								"bh_regex_close",
-								"bh_regex_content",
-								"bh_curly",
-								"bh_curly_center",
-								"bh_curly_open",
-								"bh_curly_close",
-								"bh_curly_content",
-								"bh_square",
-								"bh_square_center",
-								"bh_square_open",
-								"bh_square_close",
-								"bh_square_content",
-								"bh_angle",
-								"bh_angle_center",
-								"bh_angle_open",
-								"bh_angle_close",
-								"bh_angle_content",
 								"bh_single_quote",
 								"bh_single_quote_center",
 								"bh_single_quote_open",
 								"bh_single_quote_close",
 								"bh_single_quote_content",
+								"bh_default",
+								"bh_default_center",
+								"bh_default_open",
+								"bh_default_close",
+								"bh_default_content",
+								"bh_square",
+								"bh_square_center",
+								"bh_square_open",
+								"bh_square_close",
+								"bh_square_content",
 								"bh_unmatched",
 								"bh_unmatched_center",
 								"bh_unmatched_open",
 								"bh_unmatched_close",
 								"bh_unmatched_content",
+								"bh_double_quote",
+								"bh_double_quote_center",
+								"bh_double_quote_open",
+								"bh_double_quote_close",
+								"bh_double_quote_content",
+								"bh_angle",
+								"bh_angle_center",
+								"bh_angle_open",
+								"bh_angle_close",
+								"bh_angle_content",
 								"bh_tag",
 								"bh_tag_center",
 								"bh_tag_open",
 								"bh_tag_close",
-								"bh_tag_content"
+								"bh_tag_content",
+								"bh_regex",
+								"bh_regex_center",
+								"bh_regex_open",
+								"bh_regex_close",
+								"bh_regex_content",
+								"bh_c_define",
+								"bh_c_define_center",
+								"bh_c_define_open",
+								"bh_c_define_close",
+								"bh_c_define_content",
+								"bh_curly",
+								"bh_curly_center",
+								"bh_curly_open",
+								"bh_curly_close",
+								"bh_curly_content",
+								"bh_round",
+								"bh_round_center",
+								"bh_round_open",
+								"bh_round_close",
+								"bh_round_content"
 							],
+							"is_init_dirty_state": true,
+							"origin_encoding": "UTF-8",
 							"side_bar_folders_auto_load_folder": 1,
 							"syntax": "Packages/MarkdownEditing/Markdown.tmLanguage"
 						},
 						"translation.x": 0.0,
-						"translation.y": 421.0,
+						"translation.y": 205.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 1,
+					"stack_index": 7,
 					"type": "text"
 				}
 			]
@@ -1905,6 +2263,62 @@
 		"height": 124.0
 	},
 	"output.build|E:\\WorkFiles\\ArduinoWork\\FoldClothes|1467042142.466401":
+	{
+		"height": 124.0
+	},
+	"output.build|F:\\10_WorkFiles\\ArduinoWork\\FoldClothes|1504785734.665695":
+	{
+		"height": 124.0
+	},
+	"output.build|F:\\10_WorkFiles\\ArduinoWork\\FoldClothes|1504786429.584367":
+	{
+		"height": 170.0
+	},
+	"output.build|F:\\10_WorkFiles\\ArduinoWork\\FoldClothes|1504786514.082533":
+	{
+		"height": 124.0
+	},
+	"output.build|F:\\10_WorkFiles\\ArduinoWork\\FoldClothes|1504786799.801463":
+	{
+		"height": 124.0
+	},
+	"output.build|F:\\10_WorkFiles\\ArduinoWork\\FoldClothes|1504786826.98744":
+	{
+		"height": 124.0
+	},
+	"output.build|F:\\10_WorkFiles\\ArduinoWork\\FoldClothes|1504786907.498017":
+	{
+		"height": 124.0
+	},
+	"output.build|F:\\10_WorkFiles\\ArduinoWork\\FoldClothes|1504786918.332786":
+	{
+		"height": 124.0
+	},
+	"output.build|F:\\10_WorkFiles\\ArduinoWork\\FoldClothes|1504786936.365038":
+	{
+		"height": 214.0
+	},
+	"output.build|F:\\10_WorkFiles\\ArduinoWork\\FoldClothes|1504787069.362931":
+	{
+		"height": 124.0
+	},
+	"output.build|F:\\10_WorkFiles\\ArduinoWork\\FoldClothes|1504787239.567639":
+	{
+		"height": 124.0
+	},
+	"output.build|F:\\10_WorkFiles\\ArduinoWork\\FoldClothes|1504787288.234507":
+	{
+		"height": 124.0
+	},
+	"output.build|F:\\10_WorkFiles\\ArduinoWork\\FoldClothes|1504787364.678416":
+	{
+		"height": 124.0
+	},
+	"output.build|F:\\10_WorkFiles\\ArduinoWork\\FoldClothes|1504787386.457659":
+	{
+		"height": 197.0
+	},
+	"output.build|L:\\06. 项目\\04. NewPower\\叠衣板v2.0\\foldClothes|1504786715.130767":
 	{
 		"height": 124.0
 	},

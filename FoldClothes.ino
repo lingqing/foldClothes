@@ -3,6 +3,12 @@
  * Description: 鍙犺。鏉跨▼搴忥紝瀹屾垚鍙犺。鏈嶇殑宸ヤ綔
  * Author:  AndyLiang
  * Date :   2016-6-16 
+ *
+ * update : V2.0 
+ *         change put cloth way to using Arm
+ *         which need send G-code, so add softwareserial to communit
+ *         with Arm
+ *         2017-09-06, AndyLiang
  *******************************************************************/
  /* ---------- user define ------------- */  
 // servo
@@ -19,6 +25,7 @@
 #include "MusicPlayer.h"
 #include "UserServo.h"
 
+#include "GcodeSender.h"  // softwareserial to communit to Arm
 /* ---------- define ------------- */ 
 // define
 #define MOTOR1_RUN_A 3
@@ -32,8 +39,9 @@
 #define LIMIT_RIGHT   10
 #define LIMIT_BACK    12
 
-#define DETECT_PIN    13    // 衣服坚持传感器
+#define DETECT_PIN    13    // 衣服检测传感器
 #define PLATE_PIN     9
+
 
 // #define SPEAK
 // #define _TEST_
@@ -46,15 +54,18 @@ typedef enum{
   WHIRL,
   ENDING,
   TEST,
-  }MachineState;
+}MachineState;
 
-  /* ---------- global var ------------- */
-  Servo servoPlate;
-  // UserServo servoPlate;
-  UserMotor motor1(1);
-  UserMotor motor2(2);
-  UserMotor motor3(3);
-  MusicPlayer player;
+/* ---------- global var ------------- */
+Servo servoPlate;
+// UserServo servoPlate;
+UserMotor motor1(1);
+UserMotor motor2(2);
+UserMotor motor3(3);
+MusicPlayer player;
+
+//
+GcodeSender sender;
 // ColorSensor colorSensor;
 MachineState state;
 static uint8_t colorClothes = 0;
